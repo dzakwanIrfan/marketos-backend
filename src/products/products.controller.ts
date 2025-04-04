@@ -1,4 +1,4 @@
-import { Body, Controller, FileTypeValidator, Get, MaxFileSizeValidator, ParseFilePipe, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, FileTypeValidator, Get, MaxFileSizeValidator, Param, ParseFilePipe, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { createProductRequest } from './dto/create-product.request';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -7,6 +7,7 @@ import { ProductsService } from './products.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { PRODUCT_IMAGES } from './product-images';
 
 @Controller('products')
 export class ProductsController {
@@ -26,7 +27,7 @@ export class ProductsController {
     @UseInterceptors(
         FileInterceptor('image', {
             storage: diskStorage({
-                destination: './public/products',
+                destination: PRODUCT_IMAGES,
                 filename: (req, file, callback) => {
                     if (!file) {
                         return callback(new Error('File not found'), '');
@@ -59,4 +60,10 @@ export class ProductsController {
     async getProducts() {
         return this.productService.getProducts();
     }
+
+    @Get(':productId')
+    @UseGuards(JwtAuthGuard)
+    async getProduct(@Param('productId') productId: string) {
+        return this.productService.getProduct(+productId);
+    } 
 }

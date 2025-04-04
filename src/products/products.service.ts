@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { createProductRequest } from './dto/create-product.request';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { promises as fs } from 'fs';
 import { join } from 'path';
+import { PRODUCT_IMAGES } from './product-images';
 
 @Injectable()
 export class ProductsService {
@@ -18,22 +19,18 @@ export class ProductsService {
     };
 
     private async getImagePath(productId: number): Promise<string | null> {
-        const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-        const basePath = join(__dirname, '../../', 'public/products');
         
         try {
-            const files = await fs.readdir(basePath);
+            const files = await fs.readdir(PRODUCT_IMAGES);
             const foundFile = files.find(file => {
                 return file.startsWith(productId.toString());
             });
-            
-            return foundFile ? `/products/${foundFile}` : null;
+            return foundFile ? `/images/products/${foundFile}` : null;
         } catch (error) {
             return null;
         }
     }
     
-    // Di getProducts():
     async getProducts() {
         const products = await this.prismaService.product.findMany();
         return Promise.all(
@@ -46,5 +43,19 @@ export class ProductsService {
                 };
             })
         );
+    }
+
+    async getProduct(productId: number) {
+        try {
+            return {
+                ...(await this.prismaService.product.findUniqueOrThrow({
+                    where: { id: productId },
+                })),
+                imageExists: await this.getImagePath(productId),
+                imageUrl: await this.getImagePath(productId),
+            };
+        } catch (error) {
+            throw new NotFoundException(`Product not found with ID ${productId}`);
+        }
     }
 };
