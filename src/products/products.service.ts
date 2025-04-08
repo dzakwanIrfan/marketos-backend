@@ -4,18 +4,25 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { PRODUCT_IMAGES } from './product-images';
+import { Prisma } from '@prisma/client';
+import { ProductGateway } from './products.gateway';
 
 @Injectable()
 export class ProductsService {
-    constructor(private readonly prismaService: PrismaService) {}
+    constructor(
+        private readonly prismaService: PrismaService,
+        private readonly productGateway: ProductGateway,
+    ) {}
 
     async createProduct(data: createProductRequest, userId: number) {
-        return this.prismaService.product.create({
+        const product = await this.prismaService.product.create({
             data: {
                 ...data,
                 userId,
             },
         });
+        this.productGateway.handleProductUpdated();
+        return product;
     };
 
     private async getImagePath(productId: number): Promise<string | null> {
@@ -31,8 +38,12 @@ export class ProductsService {
         }
     }
     
-    async getProducts() {
-        const products = await this.prismaService.product.findMany();
+    async getProducts(status?: string) {
+        const args: Prisma.ProductFindManyArgs = {};
+        if (status === 'available') {
+            args.where = { sold: false };
+        }
+        const products = await this.prismaService.product.findMany(args);
         return Promise.all(
             products.map(async (product) => {
                 const imagePath = await this.getImagePath(product.id);
@@ -57,5 +68,13 @@ export class ProductsService {
         } catch (error) {
             throw new NotFoundException(`Product not found with ID ${productId}`);
         }
+    }
+
+    async update(productId: number, data: Prisma.ProductUpdateInput) {
+        await this.prismaService.product.update({
+            where: { id: productId },
+            data,
+        });
+        this.productGateway.handleProductUpdated();
     }
 };
